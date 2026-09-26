@@ -154,18 +154,21 @@ a:hover {
   min-width: 0;
 }
 
-.brand-logo {
-  height: 34px;
-  width: auto;
+.brand-mark {
+  width: 40px;
+  height: 40px;
   display: block;
   flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(229, 65, 2, 0.25);
 }
 
-.brand-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--silver);
-  flex-shrink: 0;
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .brand-name {
@@ -177,6 +180,17 @@ a:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.15;
+}
+
+.brand-sub {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .app {
@@ -212,21 +226,34 @@ a:hover {
 
 .hero-lockup {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: flex-start;
+  flex-direction: row;
+  gap: 18px;
+  align-items: center;
 }
 
-.hero-logo {
+.hero-mark {
+  width: min(112px, 28vw);
   height: auto;
-  width: min(220px, 70vw);
+  aspect-ratio: 1;
   display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 12px 28px rgba(229, 65, 2, 0.28);
+  flex-shrink: 0;
+}
+
+.hero-lockup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .hero-assist-mark {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--blurple);
@@ -240,6 +267,7 @@ a:hover {
   font-weight: 500;
   color: var(--gray);
   line-height: 1.45;
+  padding-left: 13px;
 }
 
 .hero-copy .eyebrow {
@@ -883,7 +911,13 @@ a.news-card:focus-visible {
   }
 
   .hero-lockup {
+    flex-direction: column;
     align-items: center;
+  }
+
+  .hero-lockup-text {
+    align-items: center;
+    text-align: center;
   }
 
   .hero-assist-mark {
@@ -891,6 +925,10 @@ a.news-card:focus-visible {
     border-bottom: 3px solid var(--orange);
     padding-left: 0;
     padding-bottom: 4px;
+  }
+
+  .hero-tag {
+    padding-left: 0;
   }
 
   .lede {
@@ -935,11 +973,7 @@ a.news-card:focus-visible {
     --topbar-h: 56px;
   }
 
-  .brand-name {
-    display: none;
-  }
-
-  .brand-divider {
+  .brand-sub {
     display: none;
   }
 

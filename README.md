@@ -31,7 +31,8 @@ Colors and fonts follow the official Pearson brand sheet:
 
 - Titles/headers: **Montserrat**
 - Body: **Roboto**
-- Logos from pearsonpkg.com in `public/media/` (`pearson-logo.webp`, `pearson-logo-rev.webp`, `favicon.png`)
+- Primary brand mark: circular orange P logo in `public/media/pearson-logo.png` (topbar + hero)
+- Wordmark/reverse assets retained: `pearson-logo.webp`, `pearson-logo-rev.webp`, `favicon.png`
 
 ## Requirements
 
