@@ -1,0 +1,23 @@
+{
+  "name": "pearson-assist",
+  "version": "1.0.0",
+  "description": "PearsonAssist: voice guide for Pearson Packaging Systems, grounded only on pearsonpkg.com",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "author": "Scott Reed (smreed32)",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^7.14.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
