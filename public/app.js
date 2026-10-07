@@ -49,6 +49,7 @@ let audioCtx = null;
 let micReadyAt = 0;
 let greetingSent = false;
 let greetingPending = false;
+let greetingActive = false; // true from greeting kick until it finishes speaking
 let greetingEventId = null;
 let greetingFallbackTimer = null;
 let greetingDelayTimer = null;
@@ -104,6 +105,8 @@ function clearError() {
 }
 
 function setResearching(active, label = "Looking that up…") {
+  // The greeting kick runs through the backend; keep the UI on "Saying hello" instead of a lookup banner.
+  if (active && greetingActive) return;
   researchBanner.hidden = !active;
   researchText.textContent = label;
   if (active) setState("researching", label);
@@ -193,6 +196,7 @@ function clearGreetingTimers() {
 function greetingFallback() {
   if (!greetingPending) return;
   greetingPending = false;
+  greetingActive = false;
   clearGreetingTimers();
   if (!ready || finalized) return;
   setState("listening", "Listening. Go ahead and ask your question.");
@@ -204,6 +208,7 @@ function scheduleGreeting() {
   if (greetingSent) return;
   greetingSent = true;
   greetingPending = true;
+  greetingActive = true;
   setState("speaking", "Saying hello…");
   clearIdleTimer();
   const wait = Math.max(0, GREETING_MIC_SETTLE_MS - (Date.now() - micReadyAt));
@@ -258,6 +263,7 @@ function cleanup() {
   sessionId = null;
   greetingSent = false;
   greetingPending = false;
+  greetingActive = false;
   greetingEventId = null;
   clearGreetingTimers();
   hideSoundPrompt();
@@ -572,6 +578,7 @@ function handleServerEvent(event) {
 
     case "session.output_transcript.done":
       finalizeTurn(`assistant:${event.item_id || "live"}`);
+      greetingActive = false;
       setState("listening", "Listening. Go ahead and ask your question.");
       armIdleTimer();
       break;
