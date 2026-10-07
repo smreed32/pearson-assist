@@ -6,7 +6,7 @@
     <title>PearsonAssist · Pearson Packaging Systems</title>
     <meta
       name="description"
-      content="PearsonAssist: a voice guide for Pearson Packaging Systems visitors and customers, grounded only on pearsonpkg.com."
+      content="PearsonAssist: ask Pearson Packaging Systems about equipment, industries, service, and parts, by voice."
     />
     <meta name="theme-color" content="#e54102" />
     <link rel="icon" type="image/png" href="/media/favicon.png" />
@@ -40,7 +40,7 @@
             <span class="brand-sub">Pearson Packaging Systems</span>
           </div>
         </div>
-        <span id="statusChip" class="status-chip" data-state="idle" aria-live="polite">ready</span>
+        <span id="statusChip" class="status-chip" data-state="idle" aria-live="polite">Ready</span>
       </div>
     </header>
 
@@ -101,13 +101,13 @@
 
           <div id="researchBanner" class="research-banner" hidden>
             <span class="pulse" aria-hidden="true"></span>
-            <span id="researchText">Checking pearsonpkg.com…</span>
+            <span id="researchText">Looking that up…</span>
           </div>
           <div id="errorBox" class="error-box" hidden role="alert"></div>
 
           <div class="transcript-header">
             <h2>Conversation</h2>
-            <button id="clearTranscriptBtn" type="button" class="btn tiny ghost" aria-label="Clear conversation transcript">
+            <button id="clearTranscriptBtn" type="button" class="btn tiny ghost" aria-label="Clear conversation">
               Clear
             </button>
           </div>
@@ -116,17 +116,16 @@
           <audio id="remoteAudio" autoplay playsinline></audio>
         </section>
 
-        <section class="panel news-panel glass" aria-label="Sources from pearsonpkg.com">
+        <section class="panel news-panel glass" aria-label="Helpful pages from pearsonpkg.com">
           <div class="news-header">
-            <h2>From pearsonpkg.com</h2>
-            <span id="articleCount" class="muted">No sources yet</span>
+            <h2>Helpful pages</h2>
+            <span id="articleCount" class="muted">Nothing yet</span>
           </div>
           <div id="emptyNews" class="empty-news">
             <div class="empty-mark" aria-hidden="true"></div>
-            <p class="empty-title">Sources appear here</p>
+            <p class="empty-title">Helpful pages show up here</p>
             <p class="empty-copy">
-              Ask about case erecting, packing, sealing, palletizing, industries, service, or parts.
-              PearsonAssist will place openable pearsonpkg.com pages in this panel.
+              Ask about case erecting, packing, sealing, palletizing, industries, service, or parts, and I'll share pages from pearsonpkg.com you can open.
             </p>
           </div>
           <div id="newsList" class="news-list"></div>
@@ -148,7 +147,7 @@
           PearsonAssist · Pearson Packaging Systems
         </p>
         <p class="footer-aside">
-          Answers grounded on
+          Learn more at
           <a href="https://pearsonpkg.com" target="_blank" rel="noopener noreferrer">pearsonpkg.com</a>
           · +1 (509) 838-6226
         </p>

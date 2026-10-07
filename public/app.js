@@ -51,12 +51,12 @@ const openTurns = new Map();
 const pendingCallsByDelegation = new Map();
 
 const STATE_LABELS = {
-  idle: "ready",
-  listening: "listening",
-  thinking: "thinking",
-  researching: "researching",
-  speaking: "speaking",
-  error: "error",
+  idle: "Ready",
+  listening: "Listening",
+  thinking: "Thinking",
+  researching: "Looking it up",
+  speaking: "Speaking",
+  error: "Needs attention",
 };
 
 function setState(state, detail) {
@@ -64,6 +64,19 @@ function setState(state, detail) {
   statusChip.textContent = STATE_LABELS[state] || state;
   if (typeof detail === "string") {
     statusDetail.textContent = detail;
+  }
+}
+
+const UNAVAILABLE_MESSAGE =
+  "PearsonAssist isn't available right now. Please try again in a moment, or call our team at +1 (509) 838-6226.";
+const CONNECT_FAIL_MESSAGE =
+  "We couldn't connect. Check your internet connection and try again.";
+
+/** Error whose message is safe to show customers as-is. */
+class UserFacingError extends Error {
+  constructor(message) {
+    super(message);
+    this.userFacing = true;
   }
 }
 
@@ -78,7 +91,7 @@ function clearError() {
   errorBox.textContent = "";
 }
 
-function setResearching(active, label = "Checking pearsonpkg.com…") {
+function setResearching(active, label = "Looking that up…") {
   researchBanner.hidden = !active;
   researchText.textContent = label;
   if (active) setState("researching", label);
@@ -106,7 +119,7 @@ function armIdleTimer() {
     idleTimeout = null;
     if (!ready || finalized) return;
     endedForIdle = true;
-    setState("thinking", "Ending after a minute of quiet…");
+    setState("thinking", "Wrapping up after a quiet minute…");
     endSession();
   }, IDLE_MS);
 }
@@ -223,7 +236,7 @@ function normalizeLinkItems(payload) {
       const kind = String(item.kind || "article").toLowerCase();
       const known = KIND_LABELS[kind] ? kind : "other";
       return {
-        title: item.title || item.headline || "Untitled",
+        title: item.title || item.headline || "Pearson page",
         summary: item.summary || "",
         source: item.source || "Pearson Packaging Systems",
         url: item.url || "",
@@ -243,11 +256,11 @@ function renderLinkCards(items) {
     emptyOrb.setAttribute("aria-hidden", "true");
     const emptyTitle = document.createElement("p");
     emptyTitle.className = "empty-title";
-    emptyTitle.textContent = "No pearsonpkg.com sources";
+    emptyTitle.textContent = "No pages for that one";
     const emptyCopy = document.createElement("p");
     emptyCopy.className = "empty-copy";
     emptyCopy.textContent =
-      "No on-site sources came back for that question. Try another topic, browse pearsonpkg.com, or call +1 (509) 838-6226.";
+      "I couldn't find a page on pearsonpkg.com for that. Try asking another way, browse pearsonpkg.com, or call our team at +1 (509) 838-6226.";
     emptyNews.replaceChildren(emptyOrb, emptyTitle, emptyCopy);
     articleCount.textContent = "0 links";
     return;
@@ -375,7 +388,7 @@ function handleNestedResponseEvent(envelope) {
   switch (nested.type) {
     case "response.created":
     case "response.in_progress":
-      setResearching(true, "Checking pearsonpkg.com…");
+      setResearching(true, "Looking that up…");
       break;
     case "response.output_item.done":
       trackFunctionCall(delegationId, nested.item);
@@ -402,7 +415,7 @@ function handleServerEvent(event) {
       endedForIdle = false;
       setState(
         "listening",
-        "Connected. Ask PearsonAssist about Pearson Packaging Systems."
+        "I'm listening. Ask me about Pearson equipment, industries, service, or parts."
       );
       clearError();
       armIdleTimer();
@@ -444,24 +457,24 @@ function handleServerEvent(event) {
 
     case "session.output_transcript.done":
       finalizeTurn(`assistant:${event.item_id || "live"}`);
-      setState("listening", "Listening… ask about Pearson products, service, or parts.");
+      setState("listening", "Listening. Go ahead and ask your question.");
       armIdleTimer();
       break;
 
     case "session.delegation.created":
-      setResearching(true, "Checking pearsonpkg.com…");
+      setResearching(true, "Looking that up…");
       clearIdleTimer();
       break;
 
     case "session.commentary.append":
     case "session.commentary.appended":
-      setResearching(true, "Gathering pages from pearsonpkg.com…");
+      setResearching(true, "Finding the right pages…");
       clearIdleTimer();
       break;
 
     case "session.thinking.append":
     case "session.thinking.appended":
-      setResearching(true, "Reviewing site results…");
+      setResearching(true, "Pulling it together…");
       setState("thinking");
       clearIdleTimer();
       break;
@@ -471,13 +484,14 @@ function handleServerEvent(event) {
       break;
 
     case "error":
-      showError(event.error?.message || event.message || "Session error");
+      console.warn("Live error", event.error?.message || event.message || event);
+      showError(UNAVAILABLE_MESSAGE);
       break;
 
     default: {
       const type = String(event.type || "");
       if (type.startsWith("session.delegation.")) {
-        setResearching(true, "Still checking pearsonpkg.com…");
+        setResearching(true, "Still looking, one moment…");
         break;
       }
       // Useful while developing; keep quiet for high-frequency audio-adjacent events.
@@ -494,7 +508,8 @@ async function waitForIceGathering(connection) {
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       connection.removeEventListener("icegatheringstatechange", onState);
-      reject(new Error("Timed out while gathering ICE candidates"));
+      console.warn("Timed out while gathering ICE candidates");
+      reject(new UserFacingError(CONNECT_FAIL_MESSAGE));
     }, 10_000);
 
     function onState() {
@@ -513,7 +528,7 @@ async function startSession() {
   startBtn.disabled = true;
   finalized = false;
   clearError();
-  setState("thinking", "Connecting PearsonAssist…");
+  setState("thinking", "Getting ready…");
 
   try {
     const connection = new RTCPeerConnection();
@@ -524,7 +539,7 @@ async function startSession() {
       remoteAudio.classList.add("visible");
       remoteAudio.play().catch(() => {
         statusDetail.textContent =
-          "Select play on the audio controls to hear PearsonAssist.";
+          "Your browser blocked the sound. Tap End, then Ask PearsonAssist to try again.";
       });
     });
 
@@ -533,15 +548,16 @@ async function startSession() {
     } catch (err) {
       const name = err && typeof err === "object" ? err.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        throw new Error(
-          "Microphone permission denied. Allow mic access and try Start again."
+        throw new UserFacingError(
+          "PearsonAssist needs your microphone. Allow microphone access in your browser, then tap Ask PearsonAssist."
         );
       }
       if (name === "NotFoundError") {
-        throw new Error("No microphone found on this device.");
+        throw new UserFacingError("We couldn't find a microphone. Plug one in or try another device.");
       }
-      throw new Error(
-        err instanceof Error ? err.message : "Could not access the microphone."
+      console.warn("Microphone error", err);
+      throw new UserFacingError(
+        "We couldn't reach your microphone. Check your browser settings and try again."
       );
     }
 
@@ -564,7 +580,7 @@ async function startSession() {
     events.addEventListener("close", (event) => {
       if (event.target !== events) return;
       if (!finalized) {
-        setState("idle", "Disconnected. Tap Ask PearsonAssist to begin again.");
+        setState("idle", "The conversation stopped. Tap Ask PearsonAssist to start again.");
         cleanup();
       }
     });
@@ -584,7 +600,7 @@ async function startSession() {
         body: JSON.stringify({ sdp }),
       });
     } catch {
-      throw new Error("Network failure talking to the local session server.");
+      throw new UserFacingError(CONNECT_FAIL_MESSAGE);
     }
 
     if (!response.ok) {
@@ -595,6 +611,7 @@ async function startSession() {
       } catch {
         detail = await response.text();
       }
+      console.warn("Session request failed", response.status, detail);
       throw new Error(detail || `Session request failed (${response.status})`);
     }
 
@@ -607,8 +624,8 @@ async function startSession() {
     // The HTTP request started this session. Do not send session.start here.
     setState("thinking", "Almost ready…");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    showError(message);
+    console.warn("Start failed", error);
+    showError(error && error.userFacing ? error.message : UNAVAILABLE_MESSAGE);
     cleanup();
   }
 }
@@ -618,7 +635,7 @@ function endSession() {
   clearIdleTimer();
   endBtn.disabled = true;
   if (!endedForIdle) {
-    setState("thinking", "Ending session…");
+    setState("thinking", "Wrapping up…");
   }
   sendEvent({ type: "session.close" });
   closeTimeout = setTimeout(() => {
@@ -626,7 +643,7 @@ function endSession() {
       "idle",
       endedForIdle
         ? "Ended after a minute of quiet. Tap Ask PearsonAssist anytime."
-        : "Session closed. You can start again anytime."
+        : "Conversation ended. Tap Ask PearsonAssist to start again."
     );
     endedForIdle = false;
     cleanup();
