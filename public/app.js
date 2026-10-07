@@ -27,6 +27,7 @@ const newsList = document.getElementById("newsList");
 const emptyNews = document.getElementById("emptyNews");
 const articleCount = document.getElementById("articleCount");
 const remoteAudio = document.getElementById("remoteAudio");
+const soundBtn = document.getElementById("soundBtn");
 
 /** @type {RTCPeerConnection | null} */
 let peer = null;
@@ -42,6 +43,17 @@ let endedForIdle = false;
 let ready = false;
 let finalized = false;
 let sessionId = null;
+
+/* Mobile audio unlock + one-time greeting state */
+let audioCtx = null;
+let micReadyAt = 0;
+let greetingSent = false;
+let greetingPending = false;
+let greetingEventId = null;
+let greetingFallbackTimer = null;
+let greetingDelayTimer = null;
+const GREETING_MIC_SETTLE_MS = 800;
+const GREETING_FALLBACK_MS = 8000;
 
 /** @type {Map<string, { el: HTMLElement, text: string }>} */
 const openTurns = new Map();
@@ -106,6 +118,104 @@ function eventId(prefix) {
   return `${prefix}_${crypto.randomUUID().slice(0, 12)}`;
 }
 
+/**
+ * Must run synchronously inside the tap handler, before any await.
+ * Phones only allow audio that starts from a user gesture, so we start a
+ * silent stream on the audio element and resume an AudioContext right here.
+ */
+function unlockAudio() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) {
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === "suspended") void audioCtx.resume();
+      // Tiny silent sound so the browser treats audio as user-started.
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const blip = audioCtx.createBufferSource();
+      blip.buffer = buffer;
+      blip.connect(audioCtx.destination);
+      blip.start(0);
+      if (!remoteAudio.srcObject && audioCtx.createMediaStreamDestination) {
+        const silent = audioCtx.createMediaStreamDestination();
+        remoteAudio.srcObject = silent.stream;
+      }
+    }
+  } catch (error) {
+    console.warn("Audio unlock (context) failed", error);
+  }
+  remoteAudio.muted = false;
+  const attempt = remoteAudio.play();
+  if (attempt && typeof attempt.catch === "function") {
+    attempt.catch(() => {
+      /* The real retry happens in playRemoteAudio when the voice stream arrives. */
+    });
+  }
+}
+
+function hideSoundPrompt() {
+  soundBtn.hidden = true;
+  document.removeEventListener("pointerdown", retrySoundFromGesture, true);
+  document.removeEventListener("touchend", retrySoundFromGesture, true);
+}
+
+function retrySoundFromGesture() {
+  unlockAudio();
+  remoteAudio
+    .play()
+    .then(() => hideSoundPrompt())
+    .catch(() => {
+      /* Keep the prompt up; the next touch tries again. */
+    });
+}
+
+function showSoundPrompt() {
+  soundBtn.hidden = false;
+  document.addEventListener("pointerdown", retrySoundFromGesture, true);
+  document.addEventListener("touchend", retrySoundFromGesture, true);
+}
+
+function playRemoteAudio() {
+  remoteAudio.muted = false;
+  remoteAudio
+    .play()
+    .then(() => hideSoundPrompt())
+    .catch(() => showSoundPrompt());
+}
+
+function clearGreetingTimers() {
+  clearTimeout(greetingFallbackTimer);
+  greetingFallbackTimer = null;
+  clearTimeout(greetingDelayTimer);
+  greetingDelayTimer = null;
+}
+
+/** Greeting did not come through; quietly go back to listening. */
+function greetingFallback() {
+  if (!greetingPending) return;
+  greetingPending = false;
+  clearGreetingTimers();
+  if (!ready || finalized) return;
+  setState("listening", "Listening. Go ahead and ask your question.");
+  armIdleTimer();
+}
+
+/** One plain response.create per session so PearsonAssist speaks first. */
+function scheduleGreeting() {
+  if (greetingSent) return;
+  greetingSent = true;
+  greetingPending = true;
+  setState("speaking", "Saying hello…");
+  clearIdleTimer();
+  const wait = Math.max(0, GREETING_MIC_SETTLE_MS - (Date.now() - micReadyAt));
+  greetingDelayTimer = setTimeout(() => {
+    greetingDelayTimer = null;
+    if (!ready || finalized || !greetingPending) return;
+    greetingEventId = eventId("greeting");
+    sendEvent({ type: "response.create", event_id: greetingEventId });
+    greetingFallbackTimer = setTimeout(greetingFallback, GREETING_FALLBACK_MS);
+  }, wait);
+}
+
 function clearIdleTimer() {
   clearTimeout(idleTimeout);
   idleTimeout = null;
@@ -146,6 +256,11 @@ function cleanup() {
   remoteAudio.classList.remove("visible");
   ready = false;
   sessionId = null;
+  greetingSent = false;
+  greetingPending = false;
+  greetingEventId = null;
+  clearGreetingTimers();
+  hideSoundPrompt();
   pendingCallsByDelegation.clear();
   setResearching(false);
   startBtn.disabled = false;
@@ -413,12 +528,8 @@ function handleServerEvent(event) {
       sessionId = event.session?.id || null;
       endBtn.disabled = false;
       endedForIdle = false;
-      setState(
-        "listening",
-        "I'm listening. Ask me about Pearson equipment, industries, service, or parts."
-      );
       clearError();
-      armIdleTimer();
+      scheduleGreeting();
       break;
 
     case "session.closed":
@@ -451,6 +562,10 @@ function handleServerEvent(event) {
         event.delta || "",
         `assistant:${event.item_id || "live"}`
       );
+      if (greetingPending) {
+        greetingPending = false;
+        clearGreetingTimers();
+      }
       setState("speaking");
       clearIdleTimer();
       break;
@@ -483,10 +598,17 @@ function handleServerEvent(event) {
       handleNestedResponseEvent(event);
       break;
 
-    case "error":
+    case "error": {
       console.warn("Live error", event.error?.message || event.message || event);
+      const relatedId = event.error?.event_id || event.event_id || null;
+      if (greetingPending && (!relatedId || relatedId === greetingEventId)) {
+        // Voice service rejected the greeting kick: fall back to listening, no error box.
+        greetingFallback();
+        break;
+      }
       showError(UNAVAILABLE_MESSAGE);
       break;
+    }
 
     default: {
       const type = String(event.type || "");
@@ -537,14 +659,12 @@ async function startSession() {
     connection.addEventListener("track", (event) => {
       remoteAudio.srcObject = new MediaStream([event.track]);
       remoteAudio.classList.add("visible");
-      remoteAudio.play().catch(() => {
-        statusDetail.textContent =
-          "Your browser blocked the sound. Tap End, then Ask PearsonAssist to try again.";
-      });
+      playRemoteAudio();
     });
 
     try {
       microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micReadyAt = Date.now();
     } catch (err) {
       const name = err && typeof err === "object" ? err.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
@@ -651,7 +771,13 @@ function endSession() {
 }
 
 startBtn.addEventListener("click", () => {
+  // Unlock phone audio synchronously inside the tap, before the mic prompt or network.
+  unlockAudio();
   void startSession();
+});
+
+soundBtn.addEventListener("click", () => {
+  retrySoundFromGesture();
 });
 
 endBtn.addEventListener("click", () => {

@@ -1031,3 +1031,12 @@ a.news-card:focus-visible {
     transform: none;
   }
 }
+
+/* Mobile audio unlock retry */
+.sound-btn {
+  display: inline-flex;
+  margin: 0 0 12px;
+}
+.sound-btn[hidden] {
+  display: none;
+}
