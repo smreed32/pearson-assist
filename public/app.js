@@ -53,6 +53,8 @@ let greetingActive = false; // true from greeting kick until it finishes speakin
 let greetingEventId = null;
 let greetingFallbackTimer = null;
 let greetingDelayTimer = null;
+let greetingQuietTimer = null;
+const GREETING_QUIET_MS = 2000; // no new greeting text for this long = greeting finished
 const GREETING_MIC_SETTLE_MS = 800;
 const GREETING_FALLBACK_MS = 8000;
 
@@ -185,7 +187,20 @@ function playRemoteAudio() {
     .catch(() => showSoundPrompt());
 }
 
+/** Greeting finished speaking: switch to listening and start the quiet timer. */
+function finishGreeting() {
+  clearTimeout(greetingQuietTimer);
+  greetingQuietTimer = null;
+  if (!greetingActive) return;
+  greetingActive = false;
+  if (!ready || finalized) return;
+  setState("listening", "Listening. Go ahead and ask your question.");
+  armIdleTimer();
+}
+
 function clearGreetingTimers() {
+  clearTimeout(greetingQuietTimer);
+  greetingQuietTimer = null;
   clearTimeout(greetingFallbackTimer);
   greetingFallbackTimer = null;
   clearTimeout(greetingDelayTimer);
@@ -571,6 +586,10 @@ function handleServerEvent(event) {
       if (greetingPending) {
         greetingPending = false;
         clearGreetingTimers();
+      }
+      if (greetingActive) {
+        clearTimeout(greetingQuietTimer);
+        greetingQuietTimer = setTimeout(finishGreeting, GREETING_QUIET_MS);
       }
       setState("speaking");
       clearIdleTimer();
