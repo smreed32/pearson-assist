@@ -74,16 +74,38 @@ const STATE_LABELS = {
   error: "Needs attention",
 };
 
+const PHONE_TEXT = "+1 (509) 838-6226";
+const PHONE_HREF = "tel:+15098386226";
+
+/** Set plain text, turning the Pearson phone number into a tap-to-call link. */
+function setTextWithPhoneLink(el, text) {
+  const parts = String(text).split(PHONE_TEXT);
+  const nodes = [];
+  parts.forEach((part, index) => {
+    if (index > 0) {
+      const link = document.createElement("a");
+      link.className = "tel-link";
+      link.href = PHONE_HREF;
+      link.textContent = PHONE_TEXT;
+      nodes.push(link);
+    }
+    if (part) nodes.push(document.createTextNode(part));
+  });
+  el.replaceChildren(...nodes);
+}
+
 function setState(state, detail) {
   statusChip.dataset.state = state;
   statusChip.textContent = STATE_LABELS[state] || state;
   if (typeof detail === "string") {
-    statusDetail.textContent = detail;
+    setTextWithPhoneLink(statusDetail, detail);
   }
 }
 
 const UNAVAILABLE_MESSAGE =
   "PearsonAssist isn't available right now. Please try again in a moment, or call our team at +1 (509) 838-6226.";
+const RATE_LIMIT_MESSAGE =
+  "Too many tries. Please wait a minute and try again.";
 const CONNECT_FAIL_MESSAGE =
   "We couldn't connect. Check your internet connection and try again.";
 
@@ -97,7 +119,7 @@ class UserFacingError extends Error {
 
 function showError(message) {
   errorBox.hidden = false;
-  errorBox.textContent = message;
+  setTextWithPhoneLink(errorBox, message);
   setState("error", message);
 }
 
@@ -395,8 +417,10 @@ function renderLinkCards(items) {
     emptyTitle.textContent = "No pages for that one";
     const emptyCopy = document.createElement("p");
     emptyCopy.className = "empty-copy";
-    emptyCopy.textContent =
-      "I couldn't find a page on pearsonpkg.com for that. Try asking another way, browse pearsonpkg.com, or call our team at +1 (509) 838-6226.";
+    setTextWithPhoneLink(
+      emptyCopy,
+      "I couldn't find a page on pearsonpkg.com for that. Try asking another way, browse pearsonpkg.com, or call our team at +1 (509) 838-6226."
+    );
     emptyNews.replaceChildren(emptyOrb, emptyTitle, emptyCopy);
     articleCount.textContent = "0 links";
     return;
@@ -747,6 +771,10 @@ async function startSession() {
       });
     } catch {
       throw new UserFacingError(CONNECT_FAIL_MESSAGE);
+    }
+
+    if (response.status === 429) {
+      throw new UserFacingError(RATE_LIMIT_MESSAGE);
     }
 
     if (!response.ok) {

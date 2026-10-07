@@ -17,7 +17,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   buildLiveCreateBody,
-  isAllowedOrigin,
+  checkRateLimit,
+  clientIp,
+  isAllowedRequest,
   responsesModel,
 } from "./lib/live-config.mjs";
 
@@ -28,20 +30,34 @@ const port = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: "64kb" }));
 app.use(express.static(join(__dirname, "public")));
 
+app.all("/api/session", (request, response, next) => {
+  if (request.method === "POST") return next();
+  response.set("Allow", "POST");
+  response.status(405).json({ error: "Method not allowed" });
+});
+
 app.post("/api/session", async (request, response) => {
-  if (!isAllowedOrigin(request.headers.origin, request.headers.host)) {
-    response.status(403).json({
-      error: "Unexpected request origin",
-      hint: `Open http://localhost:${port} (or http://127.0.0.1:${port})`,
-    });
+  // Local dev only: allow http://localhost:<port> and http://127.0.0.1:<port>.
+  if (!isAllowedRequest(request.headers, { allowLocal: true })) {
+    response.status(403).json({ error: "Not allowed" });
+    return;
+  }
+  const ip = clientIp(request.headers) !== "unknown"
+    ? clientIp(request.headers)
+    : request.socket.remoteAddress || "unknown";
+  const limit = checkRateLimit(ip);
+  if (!limit.ok) {
+    response.set("Retry-After", String(limit.retryAfter));
+    response.status(429).json({ error: "Too many requests" });
     return;
   }
   if (typeof request.body?.sdp !== "string" || !request.body.sdp.trim()) {
-    response.status(400).json({ error: "An SDP offer is required" });
+    response.status(400).json({ error: "Bad request" });
     return;
   }
   if (!process.env.OPENAI_API_KEY) {
-    response.status(503).json({ error: "Set OPENAI_API_KEY on the server" });
+    console.error("OPENAI_API_KEY is not set");
+    response.status(503).json({ error: "Service unavailable" });
     return;
   }
 

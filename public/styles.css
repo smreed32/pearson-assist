@@ -312,6 +312,53 @@ a:hover {
   margin-top: 20px;
 }
 
+/* Tap-to-call phone number: never wrap mid-number */
+.tel-link {
+  white-space: nowrap;
+  color: var(--blurple);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--orange) 70%, transparent);
+  text-underline-offset: 2px;
+}
+
+.tel-link:hover {
+  color: var(--orange);
+}
+
+.footer-aside .tel-link {
+  color: color-mix(in srgb, var(--dusty-blue) 50%, white);
+  font-weight: inherit;
+}
+
+.footer-aside .tel-link:hover {
+  color: color-mix(in srgb, var(--orange) 55%, white);
+}
+
+.error-box .tel-link {
+  color: inherit;
+}
+
+/* AI / microphone notice under the Ask button */
+.ai-notice {
+  margin: 12px 0 0;
+  max-width: 38rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--gray);
+}
+
+.ai-notice a {
+  color: var(--blurple);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-notice a:hover {
+  color: var(--orange);
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -323,7 +370,6 @@ a:hover {
   box-shadow: var(--shadow-soft);
   font-size: 0.76rem;
   font-weight: 600;
-  text-transform: lowercase;
   letter-spacing: 0.04em;
   color: var(--gray);
   transition: box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease, color 0.25s ease;
@@ -524,6 +570,11 @@ a:hover {
   color: var(--gray);
 }
 
+/* The hidden attribute must win over component display rules (lookup bar, error box, etc.) */
+[hidden] {
+  display: none !important;
+}
+
 .research-banner {
   margin-top: 14px;
   display: flex;
@@ -595,6 +646,10 @@ a:hover {
   color: var(--ink-faint);
   font-size: 0.84rem;
   font-weight: 500;
+}
+
+#articleCount {
+  color: var(--gray);
 }
 
 .transcript {
@@ -931,7 +986,8 @@ a.news-card:focus-visible {
     padding-left: 0;
   }
 
-  .lede {
+  .lede,
+  .ai-notice {
     margin-left: auto;
     margin-right: auto;
   }

@@ -2,11 +2,17 @@
  * PearsonAssist Vercel serverless: create GPT-Live WebRTC session.
  * Keep OPENAI_API_KEY in Vercel env (never in the browser).
  * Docs: https://developers.openai.com/api/docs/guides/voice-webrtc
+ *
+ * Abuse controls: strict Origin allowlist (no Host fallback), Sec-Fetch-Site
+ * cross-site refusal, POST only, a Vercel Firewall per-IP rate-limit rule on
+ * /api/session, and a best-effort in-memory per-IP limiter below as backup.
  */
 import OpenAI from "openai";
 import {
   buildLiveCreateBody,
-  isAllowedOrigin,
+  checkRateLimit,
+  clientIp,
+  isAllowedRequest,
 } from "../lib/live-config.mjs";
 
 export default async function handler(request, response) {
@@ -15,24 +21,24 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: "Method not allowed" });
   }
 
-  const origin = request.headers.origin;
-  const host = request.headers.host;
-  if (!isAllowedOrigin(origin, host)) {
-    return response.status(403).json({
-      error: "Unexpected request origin",
-      hint: "Open the deployed site URL or http://localhost:3000",
-    });
+  if (!isAllowedRequest(request.headers)) {
+    return response.status(403).json({ error: "Not allowed" });
+  }
+
+  const limit = checkRateLimit(clientIp(request.headers));
+  if (!limit.ok) {
+    response.setHeader("Retry-After", String(limit.retryAfter));
+    return response.status(429).json({ error: "Too many requests" });
   }
 
   const sdp = request.body?.sdp;
   if (typeof sdp !== "string" || !sdp.trim()) {
-    return response.status(400).json({ error: "An SDP offer is required" });
+    return response.status(400).json({ error: "Bad request" });
   }
 
   if (!process.env.OPENAI_API_KEY) {
-    return response
-      .status(503)
-      .json({ error: "Set OPENAI_API_KEY on the server" });
+    console.error("OPENAI_API_KEY is not set");
+    return response.status(503).json({ error: "Service unavailable" });
   }
 
   const client = new OpenAI({ maxRetries: 0 });
